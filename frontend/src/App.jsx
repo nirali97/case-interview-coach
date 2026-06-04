@@ -53,19 +53,27 @@ export default function App() {
   const [scores, setScores] = useState([])
   const bottomRef = useRef()
 
-  useEffect(() => { startSession() }, [])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages])
+  // Proper state dependency handling
+  useEffect(() => { 
+    startSession() 
+  }, [sessionType])
+
+  useEffect(() => { 
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" }) 
+  }, [messages])
 
   async function startSession() {
     setMessages([])
     setHistory([])
     setScores([])
     setLoading(true)
-    const seed = [{ role: "user", content: `Start a fresh ${sessionType} interview session. Ask me a completely new and different opening question. Be creative and vary the topic.` }]
+    
     try {
-      const res = await axios.post(`${API}/chat`, { history: seed, session_type: sessionType })
+      // Pass empty history to trigger opening question logic
+      const res = await axios.post(`${API}/chat`, { history: [], session_type: sessionType })
       const question = res.data.next_question
-      setHistory([...seed, { role: "assistant", content: JSON.stringify(res.data) }])
+      
+      setHistory([{ role: "assistant", content: JSON.stringify(res.data) }])
       setMessages([{ type: "interviewer", text: question }])
     } catch (e) {
       setMessages([{ type: "error", text: "Could not connect. Is your backend running?" }])
@@ -77,13 +85,17 @@ export default function App() {
     if (!input.trim() || loading) return
     const userText = input.trim()
     setInput("")
+    
     const newHistory = [...history, { role: "user", content: userText }]
     setMessages(prev => [...prev, { type: "user", text: userText }])
     setLoading(true)
+    
     try {
       const res = await axios.post(`${API}/chat`, { history: newHistory, session_type: sessionType })
       const { assessment, next_question } = res.data
+      
       setHistory([...newHistory, { role: "assistant", content: JSON.stringify(res.data) }])
+      
       if (assessment) setScores(prev => [...prev, assessment.score])
       setMessages(prev => [...prev, { type: "feedback", assessment }, { type: "interviewer", text: next_question }])
     } catch (e) {
@@ -103,7 +115,7 @@ export default function App() {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         {["case", "fit", "mixed"].map(t => (
-          <button key={t} onClick={() => { setSessionType(t); setTimeout(startSession, 0) }}
+          <button key={t} onClick={() => setSessionType(t)}
             style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid #d1d5db", cursor: "pointer",
               background: sessionType === t ? "#1d4ed8" : "white",
               color: sessionType === t ? "white" : "#374151", fontSize: 13 }}>
@@ -111,9 +123,9 @@ export default function App() {
           </button>
         ))}
         <button onClick={startSession} style={{ marginLeft: "auto", padding: "5px 14px", borderRadius: 20,
-  border: "1px solid #374151", cursor: "pointer", fontSize: 13, background: "#374151", color: "white" }}>
-  New session
-</button>
+          border: "1px solid #374151", cursor: "pointer", fontSize: 13, background: "#374151", color: "white" }}>
+          New session
+        </button>
         <span style={{ fontSize: 13, color: "#6b7280" }}>Avg: <strong>{avg}</strong></span>
       </div>
 
